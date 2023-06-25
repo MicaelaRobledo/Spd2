@@ -3,7 +3,7 @@
 
 
 ## Proyecto: Sistema de incendio con Arduino
-![Tinkercad](Imagen\imagen.png)
+![Tinkercad](C:\Users\Tu vieja en tanga\Desktop\Spd2\Imagen\imagen.png)
 
 
 ## Descripción
