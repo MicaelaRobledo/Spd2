@@ -3,7 +3,7 @@
 
 
 ## Proyecto: Sistema de incendio con Arduino
-![Tinkercad](https://www.tinkercad.com/things/37nfZCN5R8J-magnificent-snaget-kasi/editel?sharecode=61Lpb1ZTBH_Xj2KDlU33oUg_xSR-acVVw6qjp4Em-tE)
+![Tinkercad](Imagen\imagen.png)
 
 
 ## Descripción
