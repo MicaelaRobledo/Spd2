@@ -1,0 +1,241 @@
+## Integrante:
+- Micaela Robledo.
+
+
+## Proyecto: Sistema de incendio con Arduino
+![Tinkercad](https://www.tinkercad.com/things/37nfZCN5R8J-magnificent-snaget-kasi/editel?sharecode=61Lpb1ZTBH_Xj2KDlU33oUg_xSR-acVVw6qjp4Em-tE)
+
+
+## Descripción
+El objetivo de este proyecto es diseñar un sistema de incendio utilizando Arduino que pueda
+detectar cambios de temperatura y activar un servo motor en caso de detectar un incendio.
+Además, se mostrará la temperatura actual y la estación del año en un display LCD.
+
+## Función principal
+1- Configura el sensor de temperatura y realiza la lectura de la temperatura ambiente. Muestra la temperatura actual en el display LCD.
+2- Define un umbral de temperatura a partir del cual se considera que hay un incendio.
+3- Cuando se detecta un incendio (temperatura por encima del umbral), se activa el servo motor para simular una respuesta del sistema de incendio.
+4- Muestra la temperatura actual y la estación del año en el display LCD.
+5- Cuando se detecta un incendio, muestra un mensaje de alarma en el display LCD.
+6- Se deberá agregar dos leds y darle una funcionalidad de su elección, acorde al proyecto previamente detallado.
+
+
+
+~~~ C++ (lenguaje en el que esta escrito)
+#include <IRremote.h>
+#include <Servo.h>
+#include <LiquidCrystal.h>
+
+#define IR_PIN 11
+#define IR_LED 13
+#define LED_INCENDIO 12
+#define INTERVALO_TEMPERATURA 500
+#define INTERVALO_LED 250
+#define TEMPMIN - 40
+#define TEMPMAX 125
+#define PIN_SERVO 10
+
+int actualMillis = 0;	
+
+int contadorPrendido = 1;
+int sistemaPrendido = 0;
+
+//temperatura
+int anteriorMillis = 0;
+int anteriorLed = 0;
+int flagAlertaLed = 0;
+int estadoLedRojo = 0;
+int umbralIncendio = 45;
+
+String estacion = "elegir";
+
+Servo servoIncendio;
+int angulo = 0;
+
+LiquidCrystal lcdDisplay(7 ,6 ,5 ,4 ,3 , 2);
+
+//Prototipos
+void VerificarSistemaPrendido(IRrecv lectura);
+void EjecutarSensorTemperatura(int *actual, int *anterior, int intervalo, int led);
+void TitilarLedIncendio(int *actual, int *anteriorLed, int intervalo, int *estadoLedRojo);
+void NotificarEstacionAno(String estacion);
+void ActivarServo(int angulo);
+
+  void setup()
+{    
+  Serial.begin(9600);
+  IrReceiver.begin(IR_PIN);
+  pinMode(IR_LED, OUTPUT);
+  pinMode(LED_INCENDIO, OUTPUT);
+
+  servoIncendio.attach(PIN_SERVO);
+  servoIncendio.write(angulo); 
+   
+  lcdDisplay.begin(16, 2);
+}
+
+void loop()
+{
+  actualMillis = millis();
+  VerificarSistemaPrendido(IrReceiver);
+  if(sistemaPrendido == 1)
+  {
+    EjecutarSensorTemperatura(&actualMillis, &anteriorMillis, INTERVALO_TEMPERATURA, LED_INCENDIO);
+	TitilarLedIncendio(&actualMillis, &anteriorLed, INTERVALO_LED, &estadoLedRojo);
+    
+    digitalWrite(LED_INCENDIO, estadoLedRojo);
+  }
+}
+
+void VerificarSistemaPrendido(IRrecv lectura)
+{
+  if(lectura.decode() == 0){
+  }
+  
+  if(lectura.decode())
+  {
+  	if (lectura.decodedIRData.decodedRawData == 0xFF00BF00)
+    {
+      contadorPrendido++;
+      if(contadorPrendido %2 == 0){
+        lcdDisplay.setCursor(0,0);
+  		lcdDisplay.print("Sistema prendido");
+        digitalWrite(IR_LED, HIGH);
+        sistemaPrendido = 1;
+        
+        delay(100);
+      	Serial.println("Estado sistema: prendido");
+      }
+      else{
+        lcdDisplay.clear();
+        lcdDisplay.setCursor(0,0);
+  		lcdDisplay.print("Sistema apagado");
+        delay(100);
+        lcdDisplay.clear();
+        
+      	digitalWrite(IR_LED, LOW);
+        sistemaPrendido = 0;
+        
+        Serial.println("Estado sistema: apagado");
+      }
+    }
+    
+  	if(sistemaPrendido == 1){
+      if (lectura.decodedIRData.decodedRawData == 0xEF10BF00){
+        estacion = "invierno";
+        umbralIncendio = 25;
+      }
+      else{
+        if (lectura.decodedIRData.decodedRawData == 0xEE11BF00){
+          estacion = "primave";
+          umbralIncendio = 35;
+        }
+        else{
+          if (lectura.decodedIRData.decodedRawData == 0xED12BF00){
+            estacion = "verano";
+            umbralIncendio = 43;
+          }
+          else{
+            if(lectura.decodedIRData.decodedRawData == 0xEB14BF00){
+              estacion = "otonio";
+              umbralIncendio = 30;
+            }
+          }
+        }
+      }
+   	}
+  }
+  lectura.resume();
+  delay(50);
+}
+  
+void EjecutarSensorTemperatura(int *actual, int *anterior, int intervalo, int led)
+{
+  if (*actual - *anterior > intervalo)
+  {
+  	int lectura = analogRead(A0);
+    int temperatura;
+  
+    temperatura = map(lectura, 20, 358, TEMPMIN, TEMPMAX);
+    lcdDisplay.clear();
+    lcdDisplay.setCursor(0,0);
+  	lcdDisplay.print("Temp.");
+    
+    lcdDisplay.setCursor(7,0);
+  	lcdDisplay.print(temperatura);
+    lcdDisplay.setCursor(12,0);
+  	lcdDisplay.print("°C");
+    NotificarEstacionAno(estacion);
+    
+	Serial.print("Temperatura ambiente: ");
+    Serial.println(temperatura);
+    
+    if(temperatura > umbralIncendio){
+      flagAlertaLed = 1;
+      lcdDisplay.clear();
+      lcdDisplay.setCursor(0,0);
+      lcdDisplay.print("ALERTA INCENDIO");
+      
+      ActivarServo(angulo);
+      
+      Serial.println("Alerta: incendio");
+    }
+    else{
+      digitalWrite(led, LOW);
+      flagAlertaLed = 0;
+      servoIncendio.write(0);
+    }
+    
+    *anterior = millis();
+  }
+}
+
+void TitilarLedIncendio(int *actual, int *anteriorLed, int intervalo, int *estadoLedRojo)
+{
+  if (flagAlertaLed == 1)
+  {
+    if (*actual - *anteriorLed > intervalo)
+    {
+      if(*estadoLedRojo == LOW)
+      {
+        *estadoLedRojo = HIGH;
+      }
+      else
+      {
+        *estadoLedRojo = LOW;
+      }
+    *anteriorLed = millis();
+    }
+  }
+}
+
+void NotificarEstacionAno(String estacion)
+{
+  lcdDisplay.setCursor(0,1);
+  lcdDisplay.print("Estacion");
+  lcdDisplay.setCursor(9,1);
+  lcdDisplay.print(estacion);
+  
+  Serial.print("Estacion del ano: ");
+  Serial.println(estacion);
+}
+
+void ActivarServo(int angulo)
+{
+  Serial.print("Posicion del angulo: ");
+  if (angulo == 0){
+    angulo = 90;
+  }
+  else{
+    if(angulo == 90)
+    {
+      angulo = 0;
+    }
+  }
+  servoIncendio.write(angulo);
+  Serial.println(angulo);
+}
+~~~
+
+## :robot: Link al proyecto
+- [proyecto](https://www.tinkercad.com/things/37nfZCN5R8J-magnificent-snaget-kasi/editel?sharecode=61Lpb1ZTBH_Xj2KDlU33oUg_xSR-acVVw6qjp4Em-tE)
